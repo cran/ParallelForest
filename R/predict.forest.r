@@ -29,7 +29,6 @@ predict.forest = function(object, newdata, ...){
 
     ### Send to compiled Fortran wrapper to get forest prediction ###
     retpred = .Fortran("predict_forest_wrapper",
-        (object@flattened.nodes)$treenum,
         (object@flattened.nodes)$tag,
         (object@flattened.nodes)$tagparent,
         (object@flattened.nodes)$tagleft,
@@ -45,11 +44,13 @@ predict.forest = function(object, newdata, ...){
         n.new,
         p,
         xtest.tof,
-        ynew_pred=integer(n.new)
+        ynew_pred_01=integer(n.new)
         )
 
     ### Return vector with forest prediction ###
-    return(retpred$ynew_pred)
+
+    ynew_pred = do.call(prep.depvar.out, append(list(retpred$ynew_pred_01), object@depvar.restore.info))
+    return(ynew_pred)
 }
 
 # set the predict function with the method defined above for the forest S4 class

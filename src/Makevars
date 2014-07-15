@@ -1,4 +1,10 @@
+#------------------------------------------------------------------------------
+#   src/Makevars file for building R package ParallelForest
+#   Copyright (C) 2014  Bertram Ieong
+#	No warranty.
+#------------------------------------------------------------------------------
 
+#####  Objects that will be needed  #####
 OBJECTS = \
 utils.o random_utils.o tree_utils.o sort_utils.o \
 impurity_measures.o classification.o forest_parallel.o \
@@ -6,6 +12,37 @@ grow_tree_wrapper.o predict_tree_wrapper.o \
 grow_forest_wrapper.o predict_forest_wrapper.o \
 fortran_unit_tests_wrapper.o
 
-
+#####  Compiler flags  #####
 PKG_FCFLAGS = $(SHLIB_OPENMP_FCFLAGS)
 PKG_LIBS = $(SHLIB_OPENMP_FCFLAGS)
+
+#####  Phony target for R's build system to invoke  #####
+all: $(SHLIB)
+
+#####  Declare dependencies and make instructions for objects  #####
+
+random_utils.o: utils.o
+
+tree_utils.o: utils.o
+
+sort_utils.o: utils.o
+
+impurity_measures.o: utils.o
+
+classification.o: utils.o tree_utils.o sort_utils.o impurity_measures.o
+
+forest_parallel.o: utils.o random_utils.o tree_utils.o sort_utils.o impurity_measures.o classification.o
+
+grow_tree_wrapper.o: utils.o tree_utils.o classification.o
+
+predict_tree_wrapper.o: utils.o tree_utils.o classification.o
+
+grow_forest_wrapper.o: utils.o tree_utils.o classification.o forest_parallel.o
+
+predict_forest_wrapper.o: utils.o tree_utils.o classification.o forest_parallel.o
+
+fortran_unit_tests_wrapper.o: random_utils.o forest_parallel.o classification.o tree_utils.o sort_utils.o
+
+#####  Clean target  #####
+clean:
+	rm -f *.o *.mod

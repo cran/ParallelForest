@@ -201,7 +201,20 @@ hr {
 
 <p><strong>ParallelForest</strong> is an R package implementing random forest classification using parallel computing, built with Fortran and OpenMP in the backend.</p>
 
-<h2>An Example</h2>
+<h2>Basic Usage</h2>
+
+<p>After loading the package, the <code>grow.forest</code> function is used to grow (fit) a random forest, which returns a fitted forest object. Afterwards, the <code>predict</code> function can be used to make predictions on the fitted forest with new data. An example is provided in the next section. For more details on the function calls, please see the help pages.</p>
+
+<pre><code class="r">install.packages(&quot;ParallelForest&quot;)  # install package if not done so already
+library(ParallelForest)  # load the ParallelForest package
+
+?grow.forest             # get the help page for growing a forest
+?predict.forest          # get the help page for predicting on a fitted forest
+?accessors.forest        # get help page for accessing elements of a fitted forest, 
+                         #     e.g. fittedforest[&quot;min_node_obs&quot;]
+</code></pre>
+
+<h2>An Example with U.S. Census Data</h2>
 
 <p>As an example of how to use the <strong>ParallelForest</strong> package, let&#39;s consider a dataset of income and other person-level characteristics based off the U.S. Census Bureau&#39;s Current Population Surveys in 1994 and 1995, where each observation is a person. This dataset can be downloaded from the UCI Machine Learning Repository <a href="http://archive.ics.uci.edu/ml/datasets/Census-Income+%28KDD%29">here</a>, which provides both a training dataset and a testing dataset.</p>
 
@@ -213,16 +226,64 @@ hr {
 
 <pre><code class="r">library(ParallelForest)
 
-data(low_high_earners)       # training dataset
-data(low_high_earners_test)  # testing dataset
+data(low_high_earners)       # cleaned and prepared training dataset
+data(low_high_earners_test)  # cleaned and prepared testing dataset
 </code></pre>
 
-<p>Then fit a forest to the training data.</p>
+<h3>Fitting a Forest</h3>
 
-<pre><code class="r">fforest = grow.forest(Y~., data=low_high_earners, 
-    min_node_obs=1000, max_depth=10,
-    numsamps=100000, numvars=5, numboots=5)
+<p>Then fit a forest to the training data. A variety of control parameters can be specified to control how the forest will be fit. However, if none are specified, like below, then the package will try to choose reasonable values for them. To explicitly choose these control parameters, see the help file (see <code>?grow.forest</code> in R).</p>
+
+<pre><code class="r">fforest = grow.forest(Y~., data=low_high_earners)
 </code></pre>
+
+<h3>The Control Parameters for Fitting</h3>
+
+<p>Since we did not choose any of the control parameters, let&#39;s see what the package chose for them.</p>
+
+<p>Since we did not choose the minimum number of observations required for a node to be split, what did the package choose?</p>
+
+<pre><code class="r">fforest[&quot;min_node_obs&quot;]
+</code></pre>
+
+<pre><code>## [1] 998
+</code></pre>
+
+<p>Since we did not choose the deepest that a tree should be fit, what did the package choose?</p>
+
+<pre><code class="r">fforest[&quot;max_depth&quot;]
+</code></pre>
+
+<pre><code>## [1] 10
+</code></pre>
+
+<p>Since we did not choose the number of samples to draw with replacement for each tree in the forest, what did the package choose?</p>
+
+<pre><code class="r">fforest[&quot;numsamps&quot;]
+</code></pre>
+
+<pre><code>## [1] 99761
+</code></pre>
+
+<p>Since we did not choose the number of variables to be randomly selected without replacement for each tree in the forest, what did the package choose?</p>
+
+<pre><code class="r">fforest[&quot;numvars&quot;]
+</code></pre>
+
+<pre><code>## [1] 5
+</code></pre>
+
+<p>Since we did not choose the number of trees in the forest, what did the package choose?</p>
+
+<pre><code class="r">fforest[&quot;numboots&quot;]
+</code></pre>
+
+<pre><code>## [1] 5
+</code></pre>
+
+<p>We could have set any of these control parameters when we first used <code>grow.forest</code>.</p>
+
+<h3>Prediction on the Training Data and on New Data</h3>
 
 <p>Then use the fitted forest to get predictions on the training data itself, and compute the percentage of observations predicted correctly. Since this is a random forest method, the prediction on the training dataset won&#39;t necessarily be perfect.</p>
 
@@ -231,7 +292,7 @@ pctcorrect_samepred = sum(low_high_earners$Y==fforest_samepred)/nrow(low_high_ea
 print(pctcorrect_samepred)
 </code></pre>
 
-<pre><code>## [1] 0.7689
+<pre><code>## [1] 0.7338
 </code></pre>
 
 <p>Now use the fitted forest to get predictions on the testing data, and compute the percentage of observations predicted correctly.</p>
@@ -241,7 +302,7 @@ pctcorrect_newpred = sum(low_high_earners$Y==fforest_newpred)/nrow(low_high_earn
 print(pctcorrect_newpred)
 </code></pre>
 
-<pre><code>## [1] 0.696
+<pre><code>## [1] 0.6617
 </code></pre>
 
 </body>

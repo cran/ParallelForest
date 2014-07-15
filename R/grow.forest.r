@@ -9,7 +9,58 @@
 grow.forest = function(formula, data, subset, na.action,
     impurity.function = "gini", model = FALSE, x = FALSE, y = FALSE,
     min_node_obs, max_depth, 
-    numsamps, numvars, numboots){
+    numsamps, numvars, numboots=5){
+
+
+    ### Create design matrix and dependent variable vector ###
+    # create model frame #
+    if(missing(data)) data=environment(formula)
+
+    if(missing(subset) & missing(na.action)){
+        m = model.frame(formula, data=data)
+    } else if(missing(subset) & !missing(na.action)){
+        m = model.frame(formula, data=data, na.action=na.action)
+    } else if(!missing(subset) & missing(na.action)){
+        m = model.frame(formula, data=data, subset=subset)
+    } else if(!missing(subset) & !missing(na.action)){
+        m = model.frame(formula, data=data, subset=subset, na.action=na.action)
+    } else {
+        stop("Error.")
+    }
+
+    # create matrices to be fed to Fortran compiled program
+    ytrain = m[,1]
+    xtrain = m[,-1]
+
+    retlist = prep.depvar.in(ytrain)
+
+    myvars = names(retlist) %in% "y.prepped"
+    depvar.restore.info = retlist[!myvars]
+
+    ytrain.tof = retlist$y.prepped
+    xtrain.tof = as.matrix(xtrain)
+    storage.mode(xtrain.tof) = "double"
+
+
+    # get data size
+    n = nrow(xtrain)
+    p = ncol(xtrain)
+
+
+    ### Put in default values if missing ###
+    if(missing(min_node_obs)){
+        min_node_obs = ceiling(n/200)
+    }
+    if(missing(max_depth)){
+        max_depth = ceiling(n/20000)
+    }
+    if(missing(numsamps)){
+        numsamps = ceiling(n/2)
+    }
+    if(missing(numvars)){
+        numvars = ceiling(0.70 * p)
+    }
+
 
     ### Input Assertions ###
     if(length(min_node_obs)!=1) stop ("min_node_obs must be a scalar.")
@@ -29,46 +80,6 @@ grow.forest = function(formula, data, subset, na.action,
     }
 
 
-    ### Create design matrix and dependent variable vector ###
-    # create model frame #
-    if(missing(subset) & missing(na.action)){
-        m = model.frame(formula, data=data)
-    } else if(missing(subset) & !missing(na.action)){
-        m = model.frame(formula, data=data, na.action=na.action)
-    } else if(!missing(subset) & missing(na.action)){
-        m = model.frame(formula, data=data, subset=subset)
-    } else if(!missing(subset) & !missing(na.action)){
-        m = model.frame(formula, data=data, subset=subset, na.action=na.action)
-    } else {
-        stop("Error.")
-    }
-
-    # create matrices to be fed to Fortran compiled program
-    ytrain = m[,1]
-    xtrain = m[,-1]
-
-    ytrain.tof = as.integer(ytrain)
-    xtrain.tof = as.matrix(xtrain)
-    storage.mode(xtrain.tof) = "double"
-
-    # assert that Y must be 0 or 1
-    y.unique.sorted = sort(unique(ytrain.tof))
-    if(length(y.unique.sorted)<2) stop("Dependent variable must have two classes.")
-    if(length(y.unique.sorted)>2) stop(paste("Dependent variable can only have two classes.",
-        "Support for more classes may be implemented in a future version of this package"))
-
-    if(sum(y.unique.sorted==c(0,1))!=2) stop(paste("The values of the",
-        "dependent variable must be automatically coercible to",
-        "integers 0 and 1. Please adjust the dependent variable in your data",
-        "so that it contains only the integers 0 and 1.",
-        "More flexible automatic coercion will be implemented in",
-        "the next version of this package."))
-
-    # get data size
-    n = nrow(xtrain)
-    p = ncol(xtrain)
-
-
     ### Fit forest with Fortran compiled program ###
 
     # determine the maximum possible number of nodes with the given max depth for the 
@@ -77,7 +88,7 @@ grow.forest = function(formula, data, subset, na.action,
     TOP_NODE_NUM = 0
     retlen = 2^(max_depth + 1 - TOP_NODE_NUM) - 1
 
-    # check feasibility of passing Fortran to R results through memroy
+    # check feasibility of passing Fortran to R results through memory
     if((as.integer(retlen*numboots) > .Machine$integer.max) | (is.na(as.integer(retlen*numboots)))){
         stop(paste("grow.forest currently does not support",
             "inputs where (2^(max_depth + 1) - 1) * numboots exceeds",
@@ -95,7 +106,6 @@ grow.forest = function(formula, data, subset, na.action,
         numsamps=as.integer(numsamps),
         numvars=as.integer(numvars),
         numboots=as.integer(numboots),
-        treenum_padded=integer(retlen*numboots),
         tag_padded=integer(retlen*numboots),
         tagparent_padded=integer(retlen*numboots),
         tagleft_padded=integer(retlen*numboots),
@@ -111,7 +121,6 @@ grow.forest = function(formula, data, subset, na.action,
 
     # unpad returned arrays and put everything into a forest object
     flattened.nodes = data.frame(
-        treenum=ret$treenum_padded[1:sum(ret$numnodes)],
         tag=ret$tag_padded[1:sum(ret$numnodes)],
         tagparent=ret$tagparent_padded[1:sum(ret$numnodes)],
         tagleft=ret$tagleft_padded[1:sum(ret$numnodes)],
@@ -132,7 +141,8 @@ grow.forest = function(formula, data, subset, na.action,
         numboots=ret$numboots,
         numnodes=ret$numnodes,
         flattened.nodes=flattened.nodes,
-        fmla=formula
+        fmla=formula,
+        depvar.restore.info=depvar.restore.info
         )
 
     ### Store model frame, x, and y if requested ###

@@ -7,8 +7,8 @@
 module forest_parallel
 
 
-use random_utils
 use utils
+use random_utils
 use tree_utils
 use sort_utils
 use impurity_measures
@@ -190,6 +190,7 @@ subroutine bootstrap_balanced(Y, X, in_numsamps, Y_boot, X_boot, opt_Yunique, op
 
     ! take care of uneven split input to numsamps
 
+    numsamps = -1
     if(mod(in_numsamps,num_Yunique)/=0) then
         if(present(opt_force_numsamps_evensplits)) then
             if(opt_force_numsamps_evensplits) then
@@ -306,8 +307,7 @@ end subroutine
 
 
 function grow_forest(Y, X, min_node_obs, max_depth, &
-    numsamps, numvars, numboots, &
-    OPT_NUM_THREADS) &
+    numsamps, numvars, numboots) &
     result(fittedforest)
 
     ! --- Declare Variables ---
@@ -317,7 +317,7 @@ function grow_forest(Y, X, min_node_obs, max_depth, &
     integer, intent(in) :: min_node_obs, max_depth
     integer, intent(in) :: numsamps, numvars, numboots
     type (node) :: fittedforest(numboots)
-    integer, optional, intent(in) :: OPT_NUM_THREADS
+    type (node_ptr) :: fittedforest_ptrarr(numboots)
 
     ! Private Variables
     integer :: N, P
@@ -401,7 +401,7 @@ function grow_forest(Y, X, min_node_obs, max_depth, &
         endif
 
         ! -- fit tree to the bootstrapped data and select variables --
-        fittedforest(treenum) = grow(Y_boot, X_boot, min_node_obs, max_depth, &
+        fittedforest_ptrarr(treenum)%t => grow(Y_boot, X_boot, min_node_obs, max_depth, &
             opt_splittable=variables_selected)     
 
         deallocate(Y_boot)
@@ -410,6 +410,27 @@ function grow_forest(Y, X, min_node_obs, max_depth, &
 
     enddo
     !$OMP END PARALLEL DO
+
+
+    do treenum=1,numboots
+        ! store the forest as an array of nodes as opposed to 
+        ! an array of node pointers
+
+        fittedforest(treenum)%depth = fittedforest_ptrarr(treenum)%t%depth
+        fittedforest(treenum)%majority = fittedforest_ptrarr(treenum)%t%majority
+        fittedforest(treenum)%has_subnodes = fittedforest_ptrarr(treenum)%t%has_subnodes
+        fittedforest(treenum)%tag = fittedforest_ptrarr(treenum)%t%tag
+
+        fittedforest(treenum)%splitvarnum = fittedforest_ptrarr(treenum)%t%splitvarnum
+        fittedforest(treenum)%splitvalue = fittedforest_ptrarr(treenum)%t%splitvalue
+
+        fittedforest(treenum)%leftnode => fittedforest_ptrarr(treenum)%t%leftnode
+        fittedforest(treenum)%rightnode => fittedforest_ptrarr(treenum)%t%rightnode
+
+        fittedforest(treenum)%parentnode => null()
+
+    enddo
+
 
     if(verbose) then
         do i=1,size(fittedforest)
@@ -561,7 +582,7 @@ function test_bootstrap_balanced_01() result(exitflag)
     real(dp) :: X(N,P)
     real(dp), allocatable :: X_boot1(:,:), X_boot2(:,:), X_boot3(:,:)
 
-    integer :: i,j
+    integer :: j
 
     logical, parameter :: verbose = .false.
 
@@ -625,8 +646,6 @@ function test_grow_forest_01() result(exitflag)
 
     type (node) :: ff(numboots)
 
-    integer :: i,j
-
     logical, parameter :: verbose = .false.
 
     exitflag = -1
@@ -682,7 +701,6 @@ function test_grow_predict_forest_01() result(exitflag)
 
     type (node) :: ff(numboots)
 
-    integer :: i,j
 
     logical, parameter :: verbose = .false.
 

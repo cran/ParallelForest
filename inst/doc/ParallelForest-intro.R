@@ -1,13 +1,26 @@
 ## ------------------------------------------------------------------------
 library(ParallelForest)
 
-data(low_high_earners)       # training dataset
-data(low_high_earners_test)  # testing dataset
+data(low_high_earners)       # cleaned and prepared training dataset
+data(low_high_earners_test)  # cleaned and prepared testing dataset
 
 ## ------------------------------------------------------------------------
-fforest = grow.forest(Y~., data=low_high_earners, 
-    min_node_obs=1000, max_depth=10,
-    numsamps=100000, numvars=5, numboots=5)
+fforest = grow.forest(Y~., data=low_high_earners)
+
+## ------------------------------------------------------------------------
+fforest["min_node_obs"]
+
+## ------------------------------------------------------------------------
+fforest["max_depth"]
+
+## ------------------------------------------------------------------------
+fforest["numsamps"]
+
+## ------------------------------------------------------------------------
+fforest["numvars"]
+
+## ------------------------------------------------------------------------
+fforest["numboots"]
 
 ## ------------------------------------------------------------------------
 fforest_samepred = predict(fforest, low_high_earners)

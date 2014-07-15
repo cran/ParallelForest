@@ -50,12 +50,12 @@ subroutine grow_tree_wrapper(n, p, xtrain, ytrain, min_node_obs, max_depth, retl
     real(dp), allocatable :: splitvalue(:)
 
     
-    type (node) fittedtree
+    type (node), pointer :: fittedtree
 
 
 
     !--- fit tree ---
-    fittedtree = grow(ytrain, xtrain, min_node_obs, max_depth)
+    fittedtree => grow(ytrain, xtrain, min_node_obs, max_depth)
 
     
     if(verbose) then
@@ -67,8 +67,7 @@ subroutine grow_tree_wrapper(n, p, xtrain, ytrain, min_node_obs, max_depth, retl
     endif
 
     if(verbose) then
-        numfittednodes = 0
-        call countnodes(fittedtree, numfittednodes)
+        numfittednodes = countnodes(fittedtree)
         print '("Before flatten, there are ", i5, " nodes in the fitted tree.")', numfittednodes
     endif
 
@@ -95,13 +94,12 @@ subroutine grow_tree_wrapper(n, p, xtrain, ytrain, min_node_obs, max_depth, retl
     splitvalue_padded(1:numnodes) = splitvalue
 
     if(verbose) then
-        numfittednodes = 0
-        call countnodes(fittedtree, numfittednodes)
+        numfittednodes = countnodes(fittedtree)
         print '("There are ", i5, " nodes in the fitted tree.")', numfittednodes
 
         print *, "Flattended Tree"
         print *, "tag tagparent tagleft tagright is_topnode &
-                depth majority has_subnodes splitvarnum splitvalue"
+                & depth majority has_subnodes splitvarnum splitvalue"
 
         fmt = '(i4, i10, i8, i9, l11, i6, i9, l13, i12, f11.3 )'
         do i=1,size(tag)

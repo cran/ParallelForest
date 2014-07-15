@@ -1,5 +1,5 @@
 !------------------------------------------------------------------------------
-!   Module of tree utilities.
+!   Module of tree (and forest) utilities.
 !   Copyright (C) 2014  Bertram Ieong
 !------------------------------------------------------------------------------
 
@@ -22,7 +22,12 @@ type node
     type (node), pointer :: leftnode, rightnode
     integer :: splitvarnum
     real(dp) :: splitvalue
-end type
+end type node
+
+
+type node_ptr
+    type (node), pointer :: t
+end type node_ptr
 
 
 contains
@@ -152,7 +157,7 @@ recursive function flat2tree(tag, tagparent, tagleft, tagright, is_topnode, &
     opt_thistag) result(tree)
 
     !--- variable declarations ---
-    type (node), target :: tree
+    type (node), pointer :: tree
 
     ! tree descriptors
     integer, intent(in) :: tag(:), tagparent(:), tagleft(:), tagright(:)
@@ -175,8 +180,11 @@ recursive function flat2tree(tag, tagparent, tagleft, tagright, is_topnode, &
     integer :: numnodes
 
     ! counting and indexing variables
-    integer :: idx
-    integer :: i
+    integer :: idx, i
+
+
+    !--- Allocate memory for this (sub)tree ---
+    allocate(tree)
 
 
     !--- Find the number of nodes in this tree ---
@@ -206,6 +214,7 @@ recursive function flat2tree(tag, tagparent, tagleft, tagright, is_topnode, &
     !--- fill in this node ---
 
     ! find the index for this tag
+    idx = -1
     do i=1,numnodes
         if(tag(i)==thistag) then
             idx=i
@@ -226,11 +235,11 @@ recursive function flat2tree(tag, tagparent, tagleft, tagright, is_topnode, &
         allocate(tree%leftnode)
         allocate(tree%rightnode)
 
-        tree%leftnode = flat2tree(tag, tagparent, tagleft, tagright, is_topnode, &
+        tree%leftnode => flat2tree(tag, tagparent, tagleft, tagright, is_topnode, &
             depth, majority, has_subnodes, splitvarnum, splitvalue, &
             tagleft(idx))
 
-        tree%rightnode = flat2tree(tag, tagparent, tagleft, tagright, is_topnode, &
+        tree%rightnode => flat2tree(tag, tagparent, tagleft, tagright, is_topnode, &
             depth, majority, has_subnodes, splitvarnum, splitvalue, &
             tagright(idx))
 
@@ -325,16 +334,27 @@ end subroutine
 
 
 
+function countnodes(t) result(numnodes)
+    ! Returns the number of nodes in a tree.
 
-recursive subroutine countnodes(t, n)
-    type (node) :: t
-    integer :: n  ! for initial function call, set to 0
+    type (node), intent(in) :: t
+    integer :: numnodes
+
+    numnodes = 0
+
+    call countnodes_rec_hlpr(t,numnodes)
+
+end function
+
+recursive subroutine countnodes_rec_hlpr(t, n)
+    type (node), intent(in) :: t
+    integer, intent(inout) :: n  ! for initial function call, set to 0
 
     n=n+1
 
     if(t%has_subnodes) then
-        call countnodes(t%leftnode, n)
-        call countnodes(t%rightnode, n)
+        call countnodes_rec_hlpr(t%leftnode, n)
+        call countnodes_rec_hlpr(t%rightnode, n)
     endif
 end subroutine
 
@@ -345,7 +365,7 @@ function test_tree2flat_flat2tree_01() result(exitflag)
     integer :: exitflag
 
     type (node), target :: tree, tree_left, tree_right, tree_right_left, tree_right_right
-    type (node) :: tree_unflattened
+    type (node), pointer :: tree_unflattened
 
     integer :: max_depth
 
@@ -437,7 +457,7 @@ function test_tree2flat_flat2tree_01() result(exitflag)
     if(verbose) then
         print *, "Flattended Tree"
         print *, "tag tagparent tagleft tagright is_topnode &
-                depth majority has_subnodes splitvarnum splitvalue"
+                & depth majority has_subnodes splitvarnum splitvalue"
 
         fmt = '(i4, i10, i8, i9, l11, i6, i9, l13, i12, f11.3 )'
         do i=1,size(tag)
@@ -449,7 +469,7 @@ function test_tree2flat_flat2tree_01() result(exitflag)
 
 
     !--- turn this flattened tree back into a tree ---
-    tree_unflattened = flat2tree(tag, tagparent, tagleft, tagright, is_topnode, &
+    tree_unflattened => flat2tree(tag, tagparent, tagleft, tagright, is_topnode, &
         depth, majority, has_subnodes, splitvarnum, splitvalue)
 
 
@@ -507,7 +527,7 @@ function test_tree2flat_flat2tree_01() result(exitflag)
         (tree%tag          /=     tree_unflattened%tag) ) then
 
         call rexit("Test failed: root node &
-            was flattened and unflattened incorrectly")
+            & was flattened and unflattened incorrectly")
     endif
 
     if( (tree%leftnode%depth        /=     tree_unflattened%leftnode%depth) .or. &
@@ -516,7 +536,7 @@ function test_tree2flat_flat2tree_01() result(exitflag)
         (tree%leftnode%tag          /=     tree_unflattened%leftnode%tag) ) then
 
         call rexit("Test failed: left node &
-            was flattened and unflattened incorrectly")
+            & was flattened and unflattened incorrectly")
     endif
 
     if( (tree%rightnode%depth        /=     tree_unflattened%rightnode%depth) .or. &
@@ -525,7 +545,7 @@ function test_tree2flat_flat2tree_01() result(exitflag)
         (tree%rightnode%tag          /=     tree_unflattened%rightnode%tag) ) then
 
         call rexit("Test failed: right node &
-            was flattened and unflattened incorrectly")
+            & was flattened and unflattened incorrectly")
     endif
 
     if( (tree%rightnode%leftnode%depth        /=     tree_unflattened%rightnode%leftnode%depth) .or. &
@@ -534,7 +554,7 @@ function test_tree2flat_flat2tree_01() result(exitflag)
         (tree%rightnode%leftnode%tag          /=     tree_unflattened%rightnode%leftnode%tag) ) then
 
         call rexit("Test failed: right node's left node &
-            was flattened and unflattened incorrectly")
+            & was flattened and unflattened incorrectly")
     endif
 
     if( (tree%rightnode%rightnode%depth        /=     tree_unflattened%rightnode%rightnode%depth) .or. &
@@ -543,7 +563,7 @@ function test_tree2flat_flat2tree_01() result(exitflag)
         (tree%rightnode%rightnode%tag          /=     tree_unflattened%rightnode%rightnode%tag) ) then
 
         call rexit("Test failed: right node's right node &
-            was flattened and unflattened incorrectly")
+            & was flattened and unflattened incorrectly")
     endif
 
 

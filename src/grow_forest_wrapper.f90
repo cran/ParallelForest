@@ -6,7 +6,6 @@
 
 subroutine grow_forest_wrapper(n, p, xtrain, ytrain, min_node_obs, max_depth, retlen, &
     numsamps, numvars, numboots, &
-    treenum_padded, &
     tag_padded, tagparent_padded, tagleft_padded, tagright_padded, is_topnode_padded, &
     depth_padded, majority_padded, has_subnodes_padded, splitvarnum_padded, splitvalue_padded, &
     numnodes)
@@ -28,7 +27,6 @@ subroutine grow_forest_wrapper(n, p, xtrain, ytrain, min_node_obs, max_depth, re
     integer, intent(in) :: numsamps, numvars, numboots
 
     ! output (flattened tree) variables
-    integer, intent(out)  :: treenum_padded(retlen*numboots)
     integer, intent(out)  :: tag_padded(retlen*numboots)
     integer, intent(out)  :: tagparent_padded(retlen*numboots), &
         tagleft_padded(retlen*numboots), tagright_padded(retlen*numboots)
@@ -75,13 +73,12 @@ subroutine grow_forest_wrapper(n, p, xtrain, ytrain, min_node_obs, max_depth, re
 
         if(numnodes(this_treenum)>retlen) then
             call rexit("Returned array length divided by the number of bootstrap samples &
-                needs to be at least the length of the number of nodes.")
+                & needs to be at least the length of the number of nodes.")
         endif
 
         ! add to padded return array, stacking trees on top of each other
         ! with all padding at the end
 
-        treenum_padded(ctr:(ctr+numnodes(this_treenum)-1 ) )      = this_treenum
         tag_padded(ctr:(ctr+numnodes(this_treenum)-1 ) )          = tag
         tagparent_padded(ctr:(ctr+numnodes(this_treenum)-1 ) )    = tagparent
         tagleft_padded(ctr:(ctr+numnodes(this_treenum)-1 ) )      = tagleft
